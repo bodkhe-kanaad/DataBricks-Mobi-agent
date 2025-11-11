@@ -195,31 +195,8 @@ def standardize_trip_schema(df: pd.DataFrame) -> pd.DataFrame:
             }
         )
 
-    # Extract station IDs and clean station names
-    # Expected format: "XXXX Some Station Name" where XXXX is a 4-char code
-    station_name_columns = []
-    if "departure_station_name" in df.columns:
-        station_name_columns.append("departure_station_name")
-    if "return_station_name" in df.columns:
-        station_name_columns.append("return_station_name")
-
-    if station_name_columns:
-        id_extract_pattern = r"^\s*([A-Za-z0-9]{4})\b"
-        name_strip_pattern = r"^\s*[A-Za-z0-9]{4}\s+"
-
-        for name_col in station_name_columns:
-            series_str = df[name_col].astype("string")
-            extracted_id = series_str.str.extract(id_extract_pattern)[0]
-            cleaned_name = series_str.str.replace(name_strip_pattern, "", regex=True).str.strip()
-
-            id_col = name_col.replace("_name", "_id")
-            if id_col in df.columns:
-                df[id_col] = df[id_col].astype("string").fillna(extracted_id)
-            else:
-                df[id_col] = extracted_id
-
-            # Prefer cleaned name if we actually removed an ID; otherwise keep original
-            df[name_col] = cleaned_name.fillna(series_str)
+    # NOTE: Do NOT parse station IDs from names here.
+    # Bronze should remain verbatim as in the source files.
 
     # Sanitize column names for Spark/Delta compatibility:
     # - lowercase
