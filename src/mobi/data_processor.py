@@ -5,6 +5,7 @@ This module handles reading CSV files, standardizing schemas across different
 data formats, and combining data into a unified format.
 """
 
+import re
 import zipfile
 from pathlib import Path
 
@@ -31,20 +32,74 @@ def read_trip_data_file(file_path: Path) -> pd.DataFrame:
     file_path = Path(file_path)
 
     try:
+        encodings = ["utf-8", "cp1252", "latin1"]
+        df = None
+
         if file_path.suffix.lower() == ".zip":
-            # Extract and read CSV from ZIP
             with zipfile.ZipFile(file_path, "r") as zip_ref:
-                # Find CSV file in the ZIP
                 csv_files = [f for f in zip_ref.namelist() if f.endswith(".csv")]
                 if not csv_files:
                     raise DataProcessorError(f"No CSV file found in {file_path}")
 
-                # Read the first CSV file
-                with zip_ref.open(csv_files[0]) as csv_file:
-                    df = pd.read_csv(csv_file)
+                for enc in encodings:
+                    # engine=c
+                    try:
+                        with zip_ref.open(csv_files[0]) as csv_file:
+                            df = pd.read_csv(csv_file, encoding=enc)
+                        print(f"  • Read with encoding={enc}, engine=c")
+                        break
+                    except UnicodeDecodeError:
+                        continue
+                    except pd.errors.ParserError:
+                        # engine=python
+                        try:
+                            with zip_ref.open(csv_files[0]) as csv_file:
+                                df = pd.read_csv(csv_file, encoding=enc, engine="python")
+                            print(f"  • Read with encoding={enc}, engine=python")
+                            break
+                        except pd.errors.ParserError:
+                            # final fallback: python + skip bad lines
+                            with zip_ref.open(csv_files[0]) as csv_file:
+                                df = pd.read_csv(
+                                    csv_file,
+                                    encoding=enc,
+                                    engine="python",
+                                    on_bad_lines="skip",
+                                )
+                            print(
+                                f"  • Read with encoding={enc}, engine=python (skip bad lines)"
+                            )
+                            break
         else:
-            # Read CSV directly
-            df = pd.read_csv(file_path)
+            for enc in encodings:
+                # engine=c
+                try:
+                    df = pd.read_csv(file_path, encoding=enc)
+                    print(f"  • Read with encoding={enc}, engine=c")
+                    break
+                except UnicodeDecodeError:
+                    continue
+                except pd.errors.ParserError:
+                    # engine=python
+                    try:
+                        df = pd.read_csv(file_path, encoding=enc, engine="python")
+                        print(f"  • Read with encoding={enc}, engine=python")
+                        break
+                    except pd.errors.ParserError:
+                        # final fallback: python + skip bad lines
+                        df = pd.read_csv(
+                            file_path,
+                            encoding=enc,
+                            engine="python",
+                            on_bad_lines="skip",
+                        )
+                        print(
+                            f"  • Read with encoding={enc}, engine=python (skip bad lines)"
+                        )
+                        break
+
+        if df is None:
+            raise DataProcessorError("Failed to decode file with standard fallbacks")
 
         return df
 
@@ -92,11 +147,30 @@ def standardize_trip_schema(df: pd.DataFrame) -> pd.DataFrame:
         if old_name in df.columns and new_name not in df.columns:
             df = df.rename(columns={old_name: new_name})
 
-    # Parse datetime columns if they exist
+    # Parse datetime columns using two common formats, then auto
+    def _parse_datetime_simple(series: pd.Series) -> pd.Series:
+        series_str = series.astype("string")
+        fmt1 = "%Y-%m-%d %H:%M"
+        parsed = pd.to_datetime(series_str, format=fmt1, errors="coerce")
+        ratio = parsed.isna().mean()
+        if ratio <= 0.10:
+            print(f"  • Parsed {series.name} format={fmt1}; NaT ratio={ratio:.2%}")
+            return parsed
+        fmt2 = "%m/%d/%Y %H:%M"
+        parsed2 = pd.to_datetime(series_str, format=fmt2, errors="coerce")
+        ratio2 = parsed2.isna().mean()
+        if ratio2 <= 0.10:
+            print(f"  • Parsed {series.name} format={fmt2}; NaT ratio={ratio2:.2%}")
+            return parsed2
+        parsed3 = pd.to_datetime(series_str, errors="coerce")
+        ratio3 = parsed3.isna().mean()
+        print(f"  • Parsed {series.name} format=auto; NaT ratio={ratio3:.2%}")
+        return parsed3
+
     datetime_columns = ["departure_time", "return_time"]
     for col in datetime_columns:
         if col in df.columns:
-            df[col] = pd.to_datetime(df[col], errors="coerce")
+            df[col] = _parse_datetime_simple(df[col])
 
     # Convert numeric columns
     numeric_columns = {
@@ -146,6 +220,34 @@ def standardize_trip_schema(df: pd.DataFrame) -> pd.DataFrame:
 
             # Prefer cleaned name if we actually removed an ID; otherwise keep original
             df[name_col] = cleaned_name.fillna(series_str)
+
+    # Sanitize column names for Spark/Delta compatibility:
+    # - lowercase
+    # - replace non [a-z0-9_] chars with underscore
+    # - prefix leading digits with underscore
+    # - collapse repeated underscores and trim edges
+    # - ensure uniqueness by suffixing _1, _2, ...
+    def _sanitize_names(names: list[str]) -> list[str]:
+        sanitized = []
+        seen = set()
+        for name in names:
+            n = str(name).strip().lower()
+            n = re.sub(r"[^a-z0-9_]+", "_", n)
+            n = re.sub(r"_+", "_", n).strip("_")
+            if n == "" or n is None:
+                n = "column"
+            if re.match(r"^[0-9]", n):
+                n = f"_{n}"
+            base = n
+            i = 1
+            while n in seen:
+                n = f"{base}_{i}"
+                i += 1
+            seen.add(n)
+            sanitized.append(n)
+        return sanitized
+
+    df.columns = _sanitize_names(list(df.columns))
 
     return df
 
