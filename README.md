@@ -34,7 +34,9 @@ This repository is intentionally minimal. It provides:
 - unified configuration via `config.yaml`
 - example workflows you can adapt, extend, or replace
 
-You are expected to build your **own machine learning, ranking, forecasting, or agentic logic** on top of this foundation.
+You will build your **own machine learning, ranking, forecasting, or agentic logic** on top of this foundation.
+
+Data for this project was pulled from the public Mobi Vancouver GBFS feeds; for full feed definitions and additional fields you can leverage, check out the official GBFS specification: https://github.com/MobilityData/gbfs
 
 ---
 
