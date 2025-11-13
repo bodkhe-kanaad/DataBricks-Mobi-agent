@@ -27,7 +27,7 @@ from mobi.metadata_agent import (
     analyze_and_update_table,
     summarize_table,
 )
-from mobi.sample_agent import ChatAgent, demo as sample_agent_demo
+from mobi.sample_agent import DatabricksAgent, demo as sample_agent_demo
 
 __version__ = "0.1.0"
 
@@ -47,6 +47,6 @@ __all__ = [
     "BasicSiteScraper",
     "analyze_and_update_table",
     "summarize_table",
-    "ChatAgent",
+    "DatabricksAgent",
     "sample_agent_demo",
 ]
