@@ -1,5 +1,5 @@
-catalog: [FILL ME IN]
-schema: [FILL ME IN]
+catalog: vanhack
+schema: mobi_data
 raw_data_vol: raw_data
 run_web_scrape: false
 scrape_url: https://www.mobibikes.ca/en/
