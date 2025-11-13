@@ -38,39 +38,84 @@ class DatabricksAgent:
     def __init__(self, spark: SparkSession):
         self.spark = spark
 
+    @staticmethod
+    def _escape_literal(value: str) -> str:
+        """Very small helper to escape single quotes for SQL string literals."""
+        return value.replace("'", "''")
+
+    @staticmethod
+    def _format_missing_function_hint(function_name: str) -> Dict[str, Any]:
+        return {
+            "error": f"Function '{function_name}' not found in Unity Catalog",
+            "hint": (
+                "Verify the notebook in 02_tools.ipynb has been run and that "
+                "the function exists in `vanhack.mobi_data`."
+            ),
+        }
+
     # ---- low-level callers for the deployed tools -----------------
     def _call_live_status(self, station_id: str) -> Optional[Dict[str, Any]]:
-        sql = f"SELECT * FROM `vanhack`.`mobi_data`.live_station_status('{station_id}')"
+        safe_station = self._escape_literal(station_id)
+        sql = (
+            "SELECT * FROM TABLE(vanhack.mobi_data.live_station_status('")
+            + safe_station
+            + "'))"
+        )
         try:
             df = self.spark.sql(sql)
             rows = [r.asDict() for r in df.collect()]
             return rows[0] if rows else None
         except Exception as e:
-            return {"error": str(e)}
+            msg = str(e)
+            if "live_station_status" in msg and "not found" in msg.lower():
+                return self._format_missing_function_hint("live_station_status")
+            return {"error": msg}
 
     def _call_nearby(self, lat: float, lon: float, radius_km: float = 1.0) -> List[Dict[str, Any]]:
-        sql = f"SELECT * FROM `vanhack`.`mobi_data`.nearby_stations({lat}, {lon}, {radius_km})"
+        sql = (
+            "SELECT * FROM TABLE(vanhack.mobi_data.nearby_stations("
+            f"{lat:.6f}, {lon:.6f}, {radius_km:.6f}))"
+        )
         try:
             df = self.spark.sql(sql)
             return [r.asDict() for r in df.collect()]
         except Exception as e:
-            return [{"error": str(e)}]
+            msg = str(e)
+            if "nearby_stations" in msg and "not found" in msg.lower():
+                return [self._format_missing_function_hint("nearby_stations")]
+            return [{"error": msg}]
 
     def _call_recent_trips(self, station_id: str, limit: int = 5) -> List[Dict[str, Any]]:
-        sql = f"SELECT * FROM `vanhack`.`mobi_data`.recent_trips_by_station('{station_id}') LIMIT {limit}"
+        safe_station = self._escape_literal(station_id)
+        sql = (
+            "SELECT * FROM TABLE(vanhack.mobi_data.recent_trips_by_station('")
+            + safe_station
+            + f"')) LIMIT {int(limit)}"
+        )
         try:
             df = self.spark.sql(sql)
             return [r.asDict() for r in df.collect()]
         except Exception as e:
-            return [{"error": str(e)}]
+            msg = str(e)
+            if "recent_trips_by_station" in msg and "not found" in msg.lower():
+                return [self._format_missing_function_hint("recent_trips_by_station")]
+            return [{"error": msg}]
 
     def _call_site_search(self, query: str, num_results: int = 3) -> List[Dict[str, Any]]:
-        sql = f"SELECT * FROM `vanhack`.`mobi_data`.site_search('{query}') LIMIT {num_results}"
+        safe_query = self._escape_literal(query)
+        sql = (
+            "SELECT * FROM TABLE(vanhack.mobi_data.site_search('")
+            + safe_query
+            + f"')) LIMIT {int(num_results)}"
+        )
         try:
             df = self.spark.sql(sql)
             return [r.asDict() for r in df.collect()]
         except Exception as e:
-            return [{"error": str(e)}]
+            msg = str(e)
+            if "site_search" in msg and "not found" in msg.lower():
+                return [self._format_missing_function_hint("site_search")]
+            return [{"error": msg}]
 
     # ---- intent parsing -------------------------------------------
     def _parse_station_id(self, text: str) -> Optional[str]:
