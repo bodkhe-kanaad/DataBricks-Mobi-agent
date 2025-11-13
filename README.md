@@ -1,64 +1,109 @@
-# Mobi Vancouver Bike Share Hackathon
+# 🚴‍♂️ Mobi Vancouver Bike Share — Databricks Hackathon Toolkit
 
-This repository gives hackathon teams a practical toolkit for exploring Vancouver's Mobi by Rogers bike share system. It bundles data acquisition, clean-room processing, feature engineering, and starter machine learning workflows designed to run quickly on Databricks serverless clusters.
+This repository provides a lightweight toolkit to help hackathon teams explore and build with Vancouver’s **Mobi by Rogers** bike share data. Everything here is designed for **Databricks Serverless**, **Unity Catalog**, and **Databricks Vector Search**, with strong emphasis on **Genie rooms** as your team’s primary agentic interface.
 
-Your mission: build an agentic system on Databricks that can reason about rider behaviors, station operations, or supporting content using the datasets assembled here. The playbooks in this repo give you the raw ingredients so you can focus on end-to-end automation, orchestration, and decision making.
+Your goal:
+**Build an intelligent, agent-powered solution that reasons about bike trips, stations, or site content using Databricks-native tools.**
+The repo gives you the raw ingredients — you bring the orchestration, automation, and machine learning.
 
-### IMPORTANT: don't forget to change the values in config.yaml to suit your environment.
+---
 
-## Highlights
+# 🔑 What’s Included
 
-- Historical trip pipeline: scrape and download the official monthly CSVs, keep a raw archive, and merge them into a bronze Parquet table ready for Unity Catalog.
-- Real time station coverage: pull station metadata and availability with a lightweight GBFS client, then persist snapshots as Parquet or Delta.
-- Exploration notebooks: run `01_data.ipynb` to build bronze and silver trip tables, `02_scrape_mobi.ipynb` to capture marketing copy, and `03_vector_search.ipynb` or `02_tools.ipynb` for additional feature tooling.
-- Forecasting starter: `05_ml.py` walks through next-day station demand forecasting with scikit-learn and Spark interoperability.
-- Extensible scraper: reuse `src/mobi/basic_site_scraper.py` to capture first party content that can enrich features or power LLM prompts.
+### **Data ingestion + standardization (Notebook: 01_data.ipynb)**
+Pulls historical monthly trip CSVs from Mobi’s public site, writes them into UC Volumes, and creates **bronze and silver Delta tables**. This notebook gives each team a consistent, queryable base dataset.
 
-## What Will You Do With This Data?
-** Some ideas:**
-- Build an autonomous planner that ingests trip history and proposes dispatch actions for high demand stations.
-- Surface ride patterns for specific neighborhoods or events, then let an LLM powered assistant explain the insights to non technical partners.
-- Prototype a rider concierge that predicts availability, recommends nearby stations, and answers FAQs using scraped site content.
-- Generate story driven dashboards that guide city stakeholders while an agent keeps the metrics refreshed and annotated.
-- Combine weather, holidays, and marketing copy to let an orchestrated workflow test hypotheses and report outcomes automatically.
+### **Utility tools + feature preparation (Notebook: 02_tools.ipynb)**
+Includes helper functions, small utilities, scraping support, and the building blocks for generating embeddings, text features, or structured metadata.
 
-## Repository Guide
+### **Retrieval workflows + Vector Search (Notebook: 03_vector_search.ipynb)**
+Demonstrates how to work with Databricks Vector Search, create an index from scraped Mobi content, and issue semantic searches. This directly supports Genie room workflows and Q&A agents.
 
-- `src/mobi`: production ready Python helpers for downloading trip CSVs, processing them into Parquet, calling the GBFS API, and working with station level datasets.
-- `01_data.ipynb`: Databricks notebook that automates the trip data bronze ingestion and silver standardization workflow.
-- `02_scrape_mobi.ipynb` and `02_tools.ipynb`: utilities for web scraping, prompt generation, and feature engineering support.
-- `03_vector_search.ipynb`: example retrieval workflow that can power question answering over scraped content.
-- `05_ml.py`: Databricks notebook script for training, evaluating, and saving baseline demand forecasts.
-- `config.yaml`: central configuration for Unity Catalog catalog.schema settings and scraper options.
-- `data/`: optional local cache of raw trip CSVs and processed Parquet files.
-- `tests/`: pytest suite with integration coverage for the GBFS client against the live API.
+---
 
-## Data Sources
+# 🧭 How Hackathon Teams Should Use This Repo
 
-- Trip history: CSV files published at https://www.mobibikes.ca/en/system-data dating back to January 2018.
-- Station metadata and status: GBFS feeds exposed by Fifteen's Mobi endpoints at https://gbfs.kappa.fifteen.eu/gbfs/2.2/mobi/en/.
-- Optional site content: HTML scraped from https://www.mobibikes.ca/ for marketing copy or FAQ context.
+This repository is intentionally minimal. It provides:
 
-## Getting Started Locally
+- historical trip data ingestion
+- simple station metadata access via GBFS
+- helpers for scraping Mobi’s public website
+- utilities for populating vector search indexes
+- unified configuration via `config.yaml`
+- example workflows you can adapt, extend, or replace
 
-1. Install Python 3.9 or later and create a virtual environment.
-2. Run `uv sync` or `pip install -e ".[dev]"` from the project root to install dependencies.
-3. Copy `config.yaml` if you need different Unity Catalog targets or scraper settings.
-4. Use the `mobi.data_downloader` and `mobi.data_processor` modules inside Python or notebooks to pull and combine data. Each function has docstrings with parameter defaults.
+You are expected to build your **own machine learning, ranking, forecasting, or agentic logic** on top of this foundation.
 
-## Running in Databricks
+---
 
-- Import the notebooks into your Databricks workspace or attach the repo as a project.
-- Create or select a Unity Catalog catalog and schema, then update `config.yaml` or the Databricks widgets in each notebook.
-- Execute `01_data.ipynb` end to end to populate bronze and silver tables such as `silver_trips` and `bronze_stations`.
-- Optionally run `05_ml.py` to build `silver_station_daily` aggregates and write `silver_station_daily_predictions`.
+# 📚 Repository Overview
 
-## Testing
+### Notebooks
+- **`01_data.ipynb`**
+  Build bronze and silver trip tables from raw CSVs stored in a UC Volume.
+- **`02_tools.ipynb`**
+  Shared utilities for scraping, feature prep, data helpers, and prompt-ready transformations.
+- **`03_vector_search.ipynb`**
+  Create and query a Vector Search index backed by Mobi site content for downstream agent or chatbot use.
 
-Run `pytest` from the project root to exercise the GBFS integration tests. Set a higher timeout if your network is slow by exporting `PYTEST_ADDOPTS="--timeout=30"`.
+### Source code
+- **`src/mobi`**
+  Python helpers for downloading trip data, processing CSVs to Parquet, scraping Mobi pages, managing configurations, and calling the GBFS API.
 
-## Next Ideas
+### Configuration
+- **`config.yaml`**
+  Set your Unity Catalog `catalog.schema`, volume names, scraper options, and concurrency settings.
 
-- Blend in weather, events, or elevation features to improve demand forecasts.
-- Swap scikit-learn baselines with AutoML or Delta Live Tables to productionize the pipeline.
-- Package helper modules into a reusable wheel for future transportation hackathons.
+### Documentation
+- **`README.md`**
+  Lightweight guidance for hackathon participants.
+
+---
+
+# 🔗 Data Sources
+
+- **Trip history CSVs:**
+  https://www.mobibikes.ca/en/system-data
+
+- **Station metadata + availability:**
+  https://gbfs.kappa.fifteen.eu/gbfs/2.2/mobi/en/
+
+- **Optional web content (scraping):**
+  https://www.mobibikes.ca/
+
+---
+
+# 🚀 Suggested Databricks Workflow
+
+1. **Clone or import this repo** into your Databricks workspace.
+2. Update `config.yaml` with your **Unity Catalog catalog + schema**.
+3. Run **01_data.ipynb** to ingest and standardize trip data.
+4. Scrape or import Mobi page content for semantic search.
+5. Build a **Vector Search index** using 03_vector_search.ipynb.
+6. Create a **Genie room** that:
+   - indexes your Delta tables
+   - uses your Vector Search endpoint
+   - calls Databricks functions/agents/tools you develop
+7. Build your ML models, planners, Q&A tools, or automations on top.
+
+---
+
+# 🧩 What You Build Is Up To You
+
+This repo provides the foundation — your team is responsible for:
+
+- intelligent ML models
+- retrieval-augmented workflows
+- autonomous or agentic flows
+- dashboards, apps, planning systems, or orchestrations
+- creativity in applying bike-share insights to real-world challenges
+
+---
+
+# ⚙️ Configuration Reminder
+
+Update the following fields in `config.yaml` before running the notebooks:
+- `catalog`
+- `schema`
+- `raw_data_vol`
+- scraper settings (optional)
